@@ -79,3 +79,4 @@ public class Block extends BaseEntity {
         this.totalFloors = totalFloors;
     }
 }
+

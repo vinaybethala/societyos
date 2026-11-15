@@ -107,3 +107,4 @@ public class ResidentController {
         return ResponseEntity.ok(residents);
     }
 }
+

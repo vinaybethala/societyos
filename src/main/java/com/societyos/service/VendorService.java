@@ -15,3 +15,4 @@ public interface VendorService {
     Page<VendorResponse> getAllVendors(VendorServiceType serviceType, VendorStatus status, Pageable pageable);
     void deleteVendor(Long id);
 }
+

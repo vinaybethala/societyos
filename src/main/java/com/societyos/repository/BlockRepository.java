@@ -11,3 +11,4 @@ public interface BlockRepository extends JpaRepository<Block, Long> {
     Optional<Block> findByName(String name);
     boolean existsByName(String name);
 }
+

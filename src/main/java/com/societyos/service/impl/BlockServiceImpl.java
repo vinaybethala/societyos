@@ -98,3 +98,4 @@ public class BlockServiceImpl implements BlockService {
         log.info("Deleted block id={} name={}", id, block.getName());
     }
 }
+

@@ -41,3 +41,4 @@ public interface FlatRepository extends JpaRepository<Flat, Long> {
     @EntityGraph(attributePaths = {"block"})
     Page<Flat> findByBlockIdAndStatus(Long blockId, FlatStatus status, Pageable pageable);
 }
+

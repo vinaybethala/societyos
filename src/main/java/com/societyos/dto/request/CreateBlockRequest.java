@@ -21,3 +21,4 @@ public record CreateBlockRequest(
         int totalFloors
 ) {
 }
+

@@ -193,3 +193,4 @@ class SocietyStructureIntegrationTest {
                 .andExpect(jsonPath("$.status", is(403)));
     }
 }
+

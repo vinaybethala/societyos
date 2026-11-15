@@ -17,3 +17,4 @@ public interface FlatService {
     Page<FlatResponse> getAllFlats(Long blockId, FlatType flatType, FlatStatus status, Pageable pageable);
     List<FlatResponse> getFlatsByBlockId(Long blockId);
 }
+

@@ -4,3 +4,4 @@ public enum VendorStatus {
     ACTIVE,
     INACTIVE
 }
+

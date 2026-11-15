@@ -114,3 +114,4 @@ public class VendorServiceImpl implements VendorService {
         log.info("Deactivated (soft-deleted) vendor id={} name={}", id, vendor.getName());
     }
 }
+

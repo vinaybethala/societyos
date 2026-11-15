@@ -30,3 +30,4 @@ public record CreateVendorRequest(
         String email
 ) {
 }
+

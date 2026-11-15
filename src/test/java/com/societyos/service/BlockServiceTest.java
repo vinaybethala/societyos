@@ -98,3 +98,4 @@ class BlockServiceTest {
         verify(blockRepository, never()).delete(any());
     }
 }
+

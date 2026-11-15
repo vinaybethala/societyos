@@ -158,3 +158,4 @@ public class Resident extends BaseEntity {
         this.status = status;
     }
 }
+

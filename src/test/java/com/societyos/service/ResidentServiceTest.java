@@ -148,3 +148,4 @@ class ResidentServiceTest {
         verify(flatRepository, never()).save(any());
     }
 }
+

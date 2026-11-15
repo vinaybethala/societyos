@@ -18,3 +18,4 @@ public interface ResidentService {
     List<ResidentResponse> getMyFlats();
     Page<ResidentResponse> getAllResidents(Long flatId, ResidentType residentType, ResidentStatus status, Pageable pageable);
 }
+

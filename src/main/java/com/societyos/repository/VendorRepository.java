@@ -23,3 +23,4 @@ public interface VendorRepository extends JpaRepository<Vendor, Long> {
 
     Page<Vendor> findByServiceTypeAndStatus(VendorServiceType serviceType, VendorStatus status, Pageable pageable);
 }
+

@@ -120,3 +120,4 @@ public class Flat extends BaseEntity {
         this.status = status;
     }
 }
+

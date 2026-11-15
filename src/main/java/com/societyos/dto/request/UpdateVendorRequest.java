@@ -35,3 +35,4 @@ public record UpdateVendorRequest(
         VendorStatus status
 ) {
 }
+

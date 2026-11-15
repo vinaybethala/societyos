@@ -45,3 +45,4 @@ public interface ResidentRepository extends JpaRepository<Resident, Long> {
     @EntityGraph(attributePaths = {"user", "flat", "flat.block"})
     Page<Resident> findByFlatIdAndStatus(Long flatId, ResidentStatus status, Pageable pageable);
 }
+

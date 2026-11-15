@@ -21,3 +21,4 @@ public record UpdateBlockRequest(
         int totalFloors
 ) {
 }
+

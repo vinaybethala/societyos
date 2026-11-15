@@ -160,3 +160,4 @@ public class ResidentServiceImpl implements ResidentService {
         return page.map(ResidentResponse::fromEntity);
     }
 }
+

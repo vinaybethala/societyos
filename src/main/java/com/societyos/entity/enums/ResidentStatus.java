@@ -4,3 +4,4 @@ public enum ResidentStatus {
     ACTIVE,
     MOVED_OUT
 }
+

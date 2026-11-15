@@ -136,3 +136,4 @@ class VendorControllerIntegrationTest {
                 .andExpect(jsonPath("$.status", is("INACTIVE")));
     }
 }
+

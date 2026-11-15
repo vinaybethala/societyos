@@ -81,3 +81,4 @@ class FlatServiceTest {
         verify(flatRepository, never()).save(any());
     }
 }
+

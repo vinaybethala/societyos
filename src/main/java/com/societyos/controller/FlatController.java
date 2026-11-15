@@ -94,3 +94,4 @@ public class FlatController {
         return ResponseEntity.ok(flats);
     }
 }
+

@@ -27,3 +27,4 @@ public record CreateFlatRequest(
         FlatType flatType
 ) {
 }
+

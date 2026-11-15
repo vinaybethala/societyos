@@ -86,3 +86,4 @@ class VendorServiceTest {
         verify(vendorRepository, times(1)).save(testVendor);
     }
 }
+
