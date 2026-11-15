@@ -75,3 +75,79 @@
 - **Database Indexing:** B-Tree index structure, composite indexes (e.g. `(flat_id, billing_month)`), index cardinality, and avoiding index misses.
 - **REST Best Practices:** Proper HTTP status codes (`201 Created` for resource creation, `400` for validation, `401` for unauthenticated, `403` for forbidden, `409` for duplicate unique constraints).
 
+
+---
+
+## Phase 2: Society Structure (Blocks, Flats, Residents) and Vendor Management
+
+### 1. What Was Built and Key Design Decisions
+
+#### A. Domain Model & Relational Hierarchy (Blocks -> Flats -> Residents)
+- **Decision:** Designed unidirectional `@ManyToOne(fetch = FetchType.LAZY)` associations from `Flat -> Block` and `Resident -> User`, `Resident -> Flat`, avoiding bidirectional `@OneToMany` collections inside `Block` and `Flat`.
+  * **Why:** Bidirectional `@OneToMany` collections (e.g. `block.getFlats()`) often cause accidental out-of-memory errors when loading thousands of flats, trigger cascading updates unintentionally, and lead to circular reference serialization loops in REST controllers (`StackOverflowError`). Unidirectional `@ManyToOne` maps foreign keys cleanly and queries are driven through repository methods with explicit pagination (`Pageable`).
+  * **Alternative considered:** Bidirectional mappings with `@JsonManagedReference` / `@JsonBackReference`. While viable, keeping entities unidirectional and returning strict DTO records completely decouples the database structure from the API contract.
+
+#### B. Flat Occupancy State Machine & Transactional Invariants
+- **Decision:** The occupancy status of a flat (`VACANT` vs `OCCUPIED`) is automatically synchronized inside transactional boundaries during resident lifecycle events:
+  * When `assignResident(...)` is invoked: Flat status is atomically updated to `OCCUPIED`.
+  * When `recordMoveOut(...)` is invoked: Resident status is changed to `MOVED_OUT`. The service executes an existential check `residentRepository.existsByFlatIdAndStatus(flatId, ACTIVE)`. If no other active residents occupy the flat, flat status atomically reverts to `VACANT`.
+  * **Why:** Prevents data anomalies where a flat is marked occupied without active residents, or marked vacant while residents still live there.
+
+#### C. Vendor Management & Soft-Deletion
+- **Decision:** Implemented soft-deletion for vendors by transitioning `VendorStatus` to `INACTIVE` rather than executing physical `DELETE` SQL statements.
+  * **Why:** In gated-community ecosystems, vendors are assigned to historical complaints, repair tickets, and billing audits. A hard SQL `DELETE` either violates foreign key constraints (`ON DELETE RESTRICT`) or cascades and wipes out historical complaint audits. Soft-deactivation retains audit integrity while preventing future task assignments.
+- **Decision:** Used `BigDecimal` for `averageRating` (`precision = 3, scale = 2`) and monetary values.
+  * **Why:** Primitive `float` and `double` use binary IEEE-754 floating-point representations that suffer from rounding errors (e.g. `0.1 + 0.2 = 0.30000000000000004`). `BigDecimal` provides exact decimal representation required in financial and metric calculations.
+
+#### D. Performance & Eliminating N+1 Queries
+- **Decision:** Annotated repository query methods with `@EntityGraph(attributePaths = {"user", "flat", "flat.block"})`.
+  * **Why:** When fetching a paginated list of residents, accessing `resident.getUser()` and `resident.getFlat().getBlock()` without an entity graph issues $1 + N + N = 2N + 1$ SQL queries. `@EntityGraph` triggers a single SQL `LEFT OUTER JOIN`, loading the resident, user, flat, and block in one single round trip.
+
+---
+
+### 2. Five Likely Interview Questions with Model Answers
+
+#### Q1: Why should we prefer `@ManyToOne` over bidirectional `@OneToMany` collections in large enterprise domain models?
+> **Answer:** In high-scale applications, a "One" side (like a `Block` or `Society`) can have thousands of child entities (flats, residents, audit logs). A bidirectional `@OneToMany List<Flat> flats` risks:
+> 1. Inefficient in-memory loading: Calling `block.getFlats().add(...)` or inspecting size loads every single child flat from the database into JVM memory.
+> 2. Collection performance overhead: Hibernate must manage collection dirty checking and persistent bag semantics.
+> 3. Unidirectional `@ManyToOne` on the child entity, combined with Spring Data JPA repository pagination (`Page<Flat> findByBlockId(Long blockId, Pageable pageable)`), guarantees constant memory usage regardless of dataset size.
+
+#### Q2: What happens under the hood when a method is annotated with `@Transactional` in Spring?
+> **Answer:** Spring creates a dynamic CGLIB or JDK dynamic proxy around the bean.
+> 1. When an external call enters the `@Transactional` method, the proxy interceptor opens a connection, binds a `TransactionStatus` to the `ThreadLocal` context, and sets `autoCommit = false` on the JDBC connection.
+> 2. If the method completes without an unhandled runtime exception (`RuntimeException` or `Error`), the proxy commits the transaction via the `PlatformTransactionManager`.
+> 3. If an uncaught `RuntimeException` or `Error` is thrown, the proxy rolls back all database modifications executed during that call.
+>
+> *(Note: Self-invocation—calling a `@Transactional` method from another method within the same class—bypasses the proxy, so transaction interceptors are not invoked!)*
+
+#### Q3: What is the difference between Lazy and Eager fetching in JPA, and why is `FetchType.EAGER` considered an anti-pattern on collections?
+> **Answer:**
+> - `FetchType.EAGER` instructs Hibernate to immediately load the associated entity or collection whenever the parent entity is fetched.
+> - `FetchType.LAZY` injects a bytecode proxy or persistent collection wrapper, deferring the SQL query until the relationship getter is first invoked in code.
+>
+> `FetchType.EAGER` on collections (`@OneToMany`, `@ManyToMany`) is considered an anti-pattern because:
+> 1. It forces queries to always load child collections even when the business logic doesn't need them, wasting CPU, memory, and database bandwidth.
+> 2. When executing JPQL `SELECT b FROM Block b`, Hibernate cannot easily optimize eager collections in the primary query and issues $N$ separate sub-queries, creating the N+1 problem by default.
+> 3. Best practice is to keep relationships `LAZY` and selectively use `@EntityGraph` or `JOIN FETCH` only for endpoints that need the child data.
+
+#### Q4: How do you handle Soft Deletes in Spring Boot and what are the trade-offs?
+> **Answer:** Soft deletion flags records as inactive (e.g. `status = 'INACTIVE'` or a timestamp `deleted_at`) instead of issuing a SQL `DELETE`.
+> - **Pros:** Preserves foreign key relationships, audit trails, and historical reporting; allows easy undelete.
+> - **Cons:**
+>   1. Unique constraints become tricky: e.g., if phone is unique, an inactive user prevents a new user from registering that same phone unless unique indexes include status or partial indexes are used.
+>   2. Queries must filter out inactive records (using `@Where(clause = "status = 'ACTIVE'")` or explicit repository conditions), otherwise deactivated rows appear in business logic.
+
+#### Q5: What is the difference between `findById(...)` and `getReferenceById(...)` in Spring Data JPA?
+> **Answer:**
+> - `findById(id)` executes an immediate SQL `SELECT` statement and returns an `Optional<T>` containing the initialized entity (or empty if not found).
+> - `getReferenceById(id)` (formerly `getOne`) does **not** hit the database immediately. Instead, it delegates to Hibernate's `EntityManager.getReference()`, returning a lazy proxy with only the ID initialized. The database is only queried if a non-ID property is accessed.
+> - **Use case:** `getReferenceById` is ideal when creating a foreign key reference (e.g., setting a `flat` reference on an invoice or resident) without paying the performance cost of a `SELECT` query when we know the ID exists.
+
+---
+
+### 3. Core Concepts to Revise for Interviews
+- **JPA Entity States:** Transient (new), Managed/Persistent (attached to session), Detached (session closed), and Removed.
+- **Dirty Checking:** How Hibernate compares snapshot states at flush time and automatically issues SQL `UPDATE` without calling `save()`.
+- **Composite Unique Constraints:** `UNIQUE (block_id, flat_number)` preventing duplicate flats per tower at the database engine level.
+- **Spring Security Method Security:** `@PreAuthorize("hasRole('ADMIN')")` vs `@PreAuthorize("hasAnyRole('ADMIN', 'RESIDENT')")`.
